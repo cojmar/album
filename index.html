@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gallery</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#e0e0e0;background:#111;min-height:100vh}
+body{padding:1.5rem}
+h1{font-size:1.6rem;font-weight:700;margin-bottom:.25rem;color:#eee}
+.top-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-bottom:.5rem}
+.search-wrap{position:relative;flex:1;min-width:180px;max-width:400px}
+.search-wrap input{width:100%;padding:.55rem .9rem .55rem 2.2rem;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#eee;font-size:.85rem;outline:none;transition:border .15s}
+.search-wrap input:focus{border-color:#666}
+.search-wrap .icon{position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:#555;font-size:.85rem;pointer-events:none}
+.filter-group{display:flex;gap:.35rem}
+.filter-btn{padding:.45rem 1rem;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#999;font-size:.8rem;cursor:pointer;transition:all .15s}
+.filter-btn:hover{background:#222;color:#ddd}
+.filter-btn.active{background:#333;color:#fff;border-color:#555}
+.subtitle{font-size:.82rem;color:#666;margin-bottom:1.5rem}
+.folder-section{margin-bottom:2.2rem}
+.folder-header{font-size:1.05rem;font-weight:600;margin-bottom:.75rem;padding-bottom:.4rem;border-bottom:1px solid #222;color:#ccc;display:flex;align-items:center;gap:.5rem}
+.folder-header span{font-size:.78rem;font-weight:400;color:#555}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.5rem}
+.thumb-wrap{display:flex;flex-direction:column;gap:.25rem}
+.thumb-wrap.hidden{display:none}
+.thumb{aspect-ratio:3/2;overflow:hidden;border-radius:5px;cursor:pointer;position:relative;background:#1a1a1a;transition:transform .12s}
+.thumb:hover{transform:scale(1.02)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .play-badge{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3)}
+.thumb .play-badge::after{content:"\25B6";font-size:2rem;color:rgba(255,255,255,.8);text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.thumb-label{font-size:.7rem;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px}
+.overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.94);display:none;justify-content:center;align-items:center;opacity:0;transition:opacity .25s}
+.overlay.active{display:flex;opacity:1}
+.overlay.closing{opacity:0}
+.overlay-bg{position:absolute;inset:0;z-index:1}
+.overlay-content{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:3rem;overflow:hidden}
+.overlay-close{position:absolute;top:.75rem;right:1rem;background:none;border:none;color:#fff;font-size:2.2rem;cursor:pointer;z-index:5;opacity:.6;transition:opacity .12s;padding:.25rem;line-height:1}
+.overlay-close:hover{opacity:1}
+.overlay-img{max-width:92vw;max-height:82vh;object-fit:contain;border-radius:4px;cursor:grab}
+.overlay-img.dragging{cursor:grabbing}
+.overlay-video{max-width:92vw;max-height:82vh;border-radius:4px;background:#000}
+.overlay-name{position:absolute;top:1rem;left:1.5rem;color:rgba(255,255,255,.6);font-size:.8rem;z-index:5;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-btn{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.06);border:none;color:#fff;font-size:2.2rem;cursor:pointer;z-index:5;padding:1.2rem .9rem;transition:background .12s;border-radius:6px;line-height:1}
+.nav-btn:hover{background:rgba(255,255,255,.15)}
+.nav-prev{left:.5rem}
+.nav-next{right:.5rem}
+.toolbar{position:absolute;bottom:1.5rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:1rem;z-index:5}
+.counter{color:rgba(255,255,255,.6);font-size:.82rem;background:rgba(0,0,0,.5);padding:.3rem .8rem;border-radius:14px}
+.download-btn{display:inline-flex;align-items:center;gap:.35rem;color:#fff;background:rgba(255,255,255,.1);border:none;padding:.3rem .8rem;border-radius:14px;cursor:pointer;font-size:.82rem;text-decoration:none;transition:background .12s}
+.download-btn:hover{background:rgba(255,255,255,.22)}
+.zoom-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;color:#fff;background:rgba(255,255,255,.1);border:none;border-radius:14px;cursor:pointer;font-size:1.1rem;line-height:1;transition:background .12s}
+.zoom-btn:hover{background:rgba(255,255,255,.22)}
+.zoom-btn:disabled{opacity:.3;cursor:default}
+.zoom-level{color:rgba(255,255,255,.6);font-size:.78rem;min-width:2.4rem;text-align:center;font-variant-numeric:tabular-nums}
+.play-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:28px;color:#fff;background:rgba(255,255,255,.1);border:none;border-radius:14px;cursor:pointer;font-size:.82rem;line-height:1;transition:background .12s}
+.play-btn:hover{background:rgba(255,255,255,.22)}
+.play-btn.active{background:rgba(0,180,80,.35)}
+.play-btn.active:hover{background:rgba(0,200,90,.5)}
+.speed-wrap{display:flex;align-items:center;gap:.35rem}
+.speed-slider{width:56px;height:4px;accent-color:#888;cursor:pointer;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.15);border-radius:2px;outline:none}
+.speed-slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#ccc;cursor:pointer;border:none}
+.speed-slider::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#ccc;cursor:pointer;border:none}
+.speed-slider:disabled{opacity:.3;cursor:default}
+.speed-label{color:rgba(255,255,255,.6);font-size:.72rem;min-width:1.8rem;text-align:center;font-variant-numeric:tabular-nums}
+@media(max-width:640px){body{padding:1rem}.grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}.nav-btn{font-size:1.4rem;padding:.6rem .4rem}.overlay-content{padding:1.5rem}.top-bar{flex-direction:column;align-items:stretch}.search-wrap{max-width:none}}
+</style>
+</head>
+<body>
+<h1>Gallery</h1>
+<div class="top-bar">
+  <div class="search-wrap">
+    <span class="icon">&#x1F50D;</span>
+    <input type="text" id="searchInput" placeholder="Search by filename..." autocomplete="off">
+  </div>
+  <div class="filter-group">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="image">Photos</button>
+    <button class="filter-btn" data-filter="video">Videos</button>
+  </div>
+</div>
+<p class="subtitle" id="subtitle">Loading...</p>
+<div id="gallery"></div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-bg" id="overlayBg"></div>
+  <button class="overlay-close" id="closeBtn">&times;</button>
+  <button class="nav-btn nav-prev" id="prevBtn">&#8249;</button>
+  <button class="nav-btn nav-next" id="nextBtn">&#8250;</button>
+  <div class="overlay-name" id="overlayName"></div>
+  <div class="overlay-content" id="overlayContent"></div>
+  <div class="toolbar">
+    <button class="zoom-btn" id="zoomOutBtn" title="Zoom out">−</button>
+    <span class="zoom-level" id="zoomLevel">100%</span>
+    <button class="zoom-btn" id="zoomInBtn" title="Zoom in">+</button>
+    <span class="counter" id="counter"></span>
+    <button class="play-btn" id="playBtn" title="Autoplay">&#9654;</button>
+    <div class="speed-wrap">
+      <input type="range" class="speed-slider" id="speedSlider" min="0.25" max="5" step="0.25" value="1">
+      <span class="speed-label" id="speedLabel">1s</span>
+    </div>
+    <a class="download-btn" id="downloadBtn" download target="_blank">&#8595; Download</a>
+  </div>
+</div>
+
+<script>
+let items = [];
+let visibleItems = [];
+let currentIndex = 0;
+let currentMedia = null;
+let currentFilter = 'all';
+let currentSearch = '';
+let zoom = 1, panX = 0, panY = 0;
+let isDragging = false, dragStartX = 0, dragStartY = 0, dragPanX = 0, dragPanY = 0;
+const ZOOM_MIN = 0.5, ZOOM_MAX = 5, ZOOM_STEP = 0.25;
+
+const overlay = document.getElementById('overlay');
+const overlayContent = document.getElementById('overlayContent');
+const overlayName = document.getElementById('overlayName');
+const counterEl = document.getElementById('counter');
+const downloadBtn = document.getElementById('downloadBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const closeBtn = document.getElementById('closeBtn');
+const overlayBg = document.getElementById('overlayBg');
+const searchInput = document.getElementById('searchInput');
+const filterBtns = document.querySelectorAll('.filter-btn');
+const subtitle = document.getElementById('subtitle');
+const gallery = document.getElementById('gallery');
+let wraps = [];
+
+function buildGallery() {
+  const folders = {};
+  for (const item of items) {
+    const folder = item.folder || '(root)';
+    if (!folders[folder]) folders[folder] = [];
+    folders[folder].push(item);
+  }
+
+  let globalIndex = 0;
+
+  for (const [folder, folderItems] of Object.entries(folders)) {
+    const section = document.createElement('div');
+    section.className = 'folder-section';
+    section.dataset.folder = folder;
+
+    const header = document.createElement('div');
+    header.className = 'folder-header';
+    header.innerHTML = folder + ' <span>' + folderItems.length + ' items</span>';
+    section.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+
+    for (const item of folderItems) {
+      const wrap = document.createElement('div');
+      wrap.className = 'thumb-wrap';
+      wrap.dataset.src = item.src;
+      wrap.dataset.type = item.type;
+      wrap.dataset.name = item.name.replace(/\.[^.]+$/, '').toLowerCase();
+      wrap.dataset.folder = folder;
+      wrap.dataset.index = globalIndex;
+
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      if (item.type === 'video') {
+        const badge = document.createElement('div');
+        badge.className = 'play-badge';
+        thumb.appendChild(badge);
+      }
+
+      const label = document.createElement('div');
+      label.className = 'thumb-label';
+      label.textContent = item.name.replace(/\.[^.]+$/, '');
+
+      wrap.appendChild(thumb);
+      wrap.appendChild(label);
+      grid.appendChild(wrap);
+      wraps.push(wrap);
+
+      globalIndex++;
+    }
+
+    section.appendChild(grid);
+    gallery.appendChild(section);
+  }
+
+  wraps.forEach(w => {
+    w.querySelector('.thumb').addEventListener('click', () => openViewer(parseInt(w.dataset.index)));
+  });
+
+  const lazyObserver = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const wrap = entry.target;
+        const thumb = wrap.querySelector('.thumb');
+        if (thumb && !thumb.querySelector('img')) {
+          const img = document.createElement('img');
+          img.src = wrap.dataset.src;
+          img.alt = '';
+          img.loading = 'lazy';
+          thumb.appendChild(img);
+        }
+        obs.unobserve(wrap);
+      }
+    });
+  }, { rootMargin: '300px' });
+
+  wraps.forEach(wrap => lazyObserver.observe(wrap));
+
+  visibleItems = [...items];
+  applyFilterAndSearch();
+}
+
+function applyFilterAndSearch() {
+  let visible = 0;
+  wraps.forEach(w => {
+    const type = w.dataset.type;
+    const name = w.dataset.name;
+    const matchFilter = currentFilter === 'all' || type === currentFilter;
+    const matchSearch = !currentSearch || name.includes(currentSearch);
+    w.classList.toggle('hidden', !(matchFilter && matchSearch));
+    if (matchFilter && matchSearch) visible++;
+  });
+  const total = items.length;
+  let info = items.filter(i => i.type === 'image').length + ' photos, ' + items.filter(i => i.type === 'video').length + ' videos';
+  if (visible < total) info += ' (' + visible + ' shown)';
+  subtitle.textContent = info;
+}
+
+searchInput.addEventListener('input', () => {
+  currentSearch = searchInput.value.trim().toLowerCase();
+  applyFilterAndSearch();
+});
+
+filterBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    filterBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    applyFilterAndSearch();
+  });
+});
+
+function openViewer(index) {
+  stopAutoplay();
+  overlay.classList.remove('closing');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  showMedia(index);
+}
+
+function closeViewer() {
+  stopAutoplay();
+  overlay.classList.add('closing');
+  document.body.style.overflow = '';
+  setTimeout(() => {
+    overlay.classList.remove('active', 'closing');
+    clearMedia();
+  }, 250);
+}
+
+function clearMedia() {
+  if (currentMedia) {
+    if (currentMedia.tagName === 'VIDEO') {
+      currentMedia.pause();
+      currentMedia.removeAttribute('src');
+      currentMedia.load();
+    }
+    currentMedia.remove();
+    currentMedia = null;
+  }
+}
+
+function showMedia(index) {
+  clearMedia();
+  currentIndex = index;
+  resetZoom();
+  const item = items[index];
+  overlayName.textContent = item.name;
+  counterEl.textContent = (index + 1) + ' / ' + items.length;
+  downloadBtn.href = item.src;
+  if (item.type === 'video') {
+    const video = document.createElement('video');
+    video.className = 'overlay-video';
+    video.controls = true;
+    video.autoplay = true;
+    video.src = item.src;
+    overlayContent.appendChild(video);
+    currentMedia = video;
+  } else {
+    const img = document.createElement('img');
+    img.className = 'overlay-img';
+    img.src = item.src;
+    overlayContent.appendChild(img);
+    currentMedia = img;
+  }
+  if (onMediaReady) onMediaReady();
+}
+
+function preloadAndNavigate(newIndex) {
+  if (pendingLoad) {
+    pendingLoad.img.onload = null;
+    pendingLoad.img.onerror = null;
+    pendingLoad = null;
+  }
+  const item = items[newIndex];
+  if (item.type === 'video') {
+    showMedia(newIndex);
+    return;
+  }
+  const img = new Image();
+  pendingLoad = { img, index: newIndex };
+  img.onload = () => {
+    if (!pendingLoad || pendingLoad.index !== newIndex) return;
+    pendingLoad = null;
+    showMedia(newIndex);
+  };
+  img.onerror = () => {
+    if (!pendingLoad || pendingLoad.index !== newIndex) return;
+    pendingLoad = null;
+    showMedia(newIndex);
+  };
+  img.src = item.src;
+}
+
+function navigate(direction) {
+  preloadAndNavigate((currentIndex + direction + items.length) % items.length);
+}
+
+prevBtn.addEventListener('click', () => { stopAutoplay(); navigate(-1); });
+nextBtn.addEventListener('click', () => { stopAutoplay(); navigate(1); });
+closeBtn.addEventListener('click', closeViewer);
+overlayBg.addEventListener('click', closeViewer);
+
+document.addEventListener('keydown', (e) => {
+  if (!overlay.classList.contains('active')) return;
+  if (e.key === 'Escape') closeViewer();
+  if (e.key === 'ArrowLeft') { stopAutoplay(); navigate(-1); }
+  if (e.key === 'ArrowRight') { stopAutoplay(); navigate(1); }
+});
+
+const zoomInBtn = document.getElementById('zoomInBtn');
+const zoomOutBtn = document.getElementById('zoomOutBtn');
+const zoomLevel = document.getElementById('zoomLevel');
+const playBtn = document.getElementById('playBtn');
+const speedSlider = document.getElementById('speedSlider');
+const speedLabel = document.getElementById('speedLabel');
+
+let autoplayTimer = null;
+let pendingLoad = null;
+let onMediaReady = null;
+
+function resetZoom() {
+  zoom = 1; panX = 0; panY = 0;
+  if (currentMedia && currentMedia.tagName === 'IMG') {
+    currentMedia.style.transform = '';
+  }
+  updateZoomUI();
+}
+
+function updateZoomUI() {
+  if (!zoomLevel) return;
+  zoomLevel.textContent = Math.round(zoom * 100) + '%';
+  zoomOutBtn.disabled = zoom <= ZOOM_MIN;
+  zoomInBtn.disabled = zoom >= ZOOM_MAX;
+}
+
+function zoomIn() {
+  if (currentMedia?.tagName !== 'IMG') return;
+  const oldZoom = zoom;
+  zoom = Math.min(zoom + ZOOM_STEP, ZOOM_MAX);
+  panX *= zoom / oldZoom;
+  panY *= zoom / oldZoom;
+  applyZoom();
+}
+
+function zoomOut() {
+  if (currentMedia?.tagName !== 'IMG') return;
+  const oldZoom = zoom;
+  zoom = Math.max(zoom - ZOOM_STEP, ZOOM_MIN);
+  panX *= zoom / oldZoom;
+  panY *= zoom / oldZoom;
+  applyZoom();
+}
+
+function applyZoom() {
+  if (!currentMedia || currentMedia.tagName !== 'IMG') return;
+  if (zoom <= 1) { zoom = 1; panX = 0; panY = 0; }
+  if (zoom === 1) {
+    currentMedia.style.transform = '';
+  } else {
+    currentMedia.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoom + ')';
+  }
+  updateZoomUI();
+}
+
+zoomOutBtn.addEventListener('click', zoomOut);
+zoomInBtn.addEventListener('click', zoomIn);
+
+overlayContent.addEventListener('wheel', (e) => {
+  if (!overlay.classList.contains('active') || currentMedia?.tagName !== 'IMG') return;
+  e.preventDefault();
+  if (e.deltaY < 0) { zoomIn(); } else { zoomOut(); }
+}, { passive: false });
+
+overlayContent.addEventListener('mousedown', (e) => {
+  if (zoom <= 1 || currentMedia?.tagName !== 'IMG') return;
+  if (e.target.closest('button, a, input, .overlay-name')) return;
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragPanX = panX;
+  dragPanY = panY;
+  if (currentMedia) currentMedia.classList.add('dragging');
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  panX = dragPanX + (e.clientX - dragStartX);
+  panY = dragPanY + (e.clientY - dragStartY);
+  applyZoom();
+});
+
+document.addEventListener('mouseup', () => {
+  if (isDragging) {
+    isDragging = false;
+    if (currentMedia) currentMedia.classList.remove('dragging');
+  }
+});
+
+overlayContent.addEventListener('dblclick', () => {
+  if (currentMedia?.tagName !== 'IMG') return;
+  if (zoom > 1) { resetZoom(); } else { zoom = 2; panX = 0; panY = 0; applyZoom(); }
+});
+
+function stopAutoplay() {
+  if (autoplayTimer) {
+    clearTimeout(autoplayTimer);
+    autoplayTimer = null;
+  }
+  onMediaReady = null;
+  playBtn.textContent = '\u25B6';
+  playBtn.classList.remove('active');
+}
+
+function startAutoplay() {
+  stopAutoplay();
+  playBtn.textContent = '\u23F8';
+  playBtn.classList.add('active');
+  onMediaReady = scheduleNext;
+  scheduleNext();
+}
+
+function scheduleNext() {
+  const ms = parseFloat(speedSlider.value) * 1000;
+  autoplayTimer = setTimeout(() => {
+    preloadAndNavigate((currentIndex + 1) % items.length);
+  }, ms);
+}
+
+function toggleAutoplay() {
+  if (autoplayTimer) { stopAutoplay(); } else { startAutoplay(); }
+}
+
+playBtn.addEventListener('click', toggleAutoplay);
+speedSlider.addEventListener('input', () => { speedLabel.textContent = speedSlider.value + 's'; });
+
+fetch('items.json')
+  .then(r => r.json())
+  .then(data => {
+    items = data;
+    buildGallery();
+  })
+  .catch(e => {
+    subtitle.textContent = 'Error loading items.json: ' + e.message;
+  });
+</script>
+</body>
+</html>
